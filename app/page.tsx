@@ -1,29 +1,30 @@
 // app/page.tsx
-import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/login");
+      }
+    });
+
+    return () => unsub();
+  }, [router]);
+
+  // UI بسيط أثناء التحويل
   return (
-    <main className="min-h-screen flex items-center justify-center p-6">
-      <Card className="w-full max-w-xl">
-        <CardHeader>
-          <CardTitle>shadcn/ui — الألوان الافتراضية</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4 text-center">
-          <Badge>Badge</Badge>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Button>Primary</Button>
-            <Button variant="secondary">Secondary</Button>
-            <Button variant="outline">Outline</Button>
-            <Button variant="ghost">Ghost</Button>
-            <Button variant="destructive">Destructive</Button>
-          </div>
-        </CardContent>
-        <CardFooter className="justify-center">
-          <Button>CTA</Button>
-        </CardFooter>
-      </Card>
+    <main className="min-h-screen grid place-items-center text-sm text-muted-foreground">
+      جارٍ التحقق من تسجيل الدخول...
     </main>
-  )
+  );
 }

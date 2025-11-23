@@ -15,8 +15,13 @@ import {
   setDoc,
 } from "firebase/firestore";
 import useClaimsRole from "@/hooks/use-claims-role";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 type NotificationItem = {
   id: string;
@@ -25,6 +30,7 @@ type NotificationItem = {
   type?: string;
   link?: string;
   createdAt?: any;
+  createdAtMs?: number; // ✅ جديد
   read?: boolean;
 };
 
@@ -40,18 +46,25 @@ export function NotificationBell() {
 
     const q = query(
       collection(db, "users", uid, "notifications"),
-      orderBy("createdAt", "desc"),
+      orderBy("createdAtMs", "desc"), // ✅ ترتيب ثابت وسريع
       limit(10)
     );
 
-    const unsub = onSnapshot(q, (snap) => {
-      const list: NotificationItem[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as any),
-      }));
-      setNotifs(list);
-      setUnreadCount(list.filter((n) => !n.read).length);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const list: NotificationItem[] = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as any),
+        }));
+        setNotifs(list);
+        setUnreadCount(list.filter((n) => !n.read).length);
+      },
+      (err) => {
+        console.error("notifications listener error:", err);
+        toast.error("تعذر تحميل الإشعارات");
+      }
+    );
 
     return () => unsub();
   }, [loading, uid]);
@@ -124,16 +137,21 @@ export function NotificationBell() {
                         <span className="h-2 w-2 rounded-full bg-blue-500 inline-block" />
                       )}
                     </div>
+
                     {n.body && (
                       <span className="text-xs text-muted-foreground line-clamp-2">
                         {n.body}
                       </span>
                     )}
-                    {n.createdAt?.toDate && (
-                      <span className="text-[11px] text-muted-foreground">
-                        {n.createdAt.toDate().toLocaleString("ar-SA")}
-                      </span>
-                    )}
+
+                    {/* ✅ تاريخ بفول باك */}
+                    <span className="text-[11px] text-muted-foreground">
+                      {n.createdAt?.toDate
+                        ? n.createdAt.toDate().toLocaleString("ar-SA")
+                        : n.createdAtMs
+                        ? new Date(n.createdAtMs).toLocaleString("ar-SA")
+                        : "—"}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -142,10 +160,13 @@ export function NotificationBell() {
         </div>
 
         <div className="border-t px-4 py-2 text-xs flex items-center justify-between">
-          <span className="text-muted-foreground">
-            تظهر آخر ١٠ إشعارات
-          </span>
-          <Button asChild variant="link" size="sm" className="px-0 h-auto text-xs">
+          <span className="text-muted-foreground">تظهر آخر ١٠ إشعارات</span>
+          <Button
+            asChild
+            variant="link"
+            size="sm"
+            className="px-0 h-auto text-xs"
+          >
             <Link href={uid ? `/employees/${uid}` : "/me"}>
               عرض في ملف الموظف
             </Link>

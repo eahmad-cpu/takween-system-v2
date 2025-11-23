@@ -24,6 +24,9 @@ const config: Config = {
   		}
   	},
   	extend: {
+		fontFamily: {
+      sans: ["var(--font-tajawal)", "system-ui", "sans-serif"],
+    },
   		backgroundImage: {
   			'takween-gradient': 'linear-gradient(135deg, hsl(var(--tkw-primary)) 0%, hsl(var(--tkw-secondary)) 60%, hsl(var(--tkw-accent)) 100%)'
   		},

@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import {
   collection,
   addDoc,
@@ -26,6 +26,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+
+
 
 // ======= ثوابت الاستهداف =======
 const HR_ROLES: Role[] = ["hr", "chairman", "ceo", "admin", "superadmin"];
@@ -175,14 +177,58 @@ export default function AnnouncementsPage() {
         return;
       }
 
-      await addDoc(collection(db, "announcements"), {
-        title,
-        content,
-        audTokens,
-        createdAt: serverTimestamp(),
-        createdBy: uid || null,
-        pinned: false,
-      });
+      const annRef = await addDoc(collection(db, "announcements"), {
+  title,
+  content,
+  audTokens,
+  createdAt: serverTimestamp(),
+  createdBy: uid || null,
+  pinned: false,
+});
+
+// ✅ هات التوكن وبعتُه للـ fanout
+try {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) {
+    console.error("fanout: missing token");
+    return;
+  }
+
+  const fanRes = await fetch("/api/fanout-announcement", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      title,
+      audTokens,
+      annId: annRef.id,
+    }),
+  });
+
+  // ✅ اقرأ النص الأول (عشان لو HTML أو فاضي)
+  const rawText = await fanRes.text();
+  let fanData: any = null;
+  try {
+    fanData = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    fanData = null;
+  }
+
+  if (!fanRes.ok) {
+    console.error("fanout status:", fanRes.status);
+    console.error("fanout rawText:", rawText); // 👈 ده أهم سطر
+    console.error("fanout data:", fanData);
+    toast.error(fanData?.error || "فشل إرسال الإشعارات");
+  } else {
+    console.log("fanout ok:", fanData);
+  }
+} catch (e) {
+  console.warn("fanout fetch error", e);
+}
+
+
 
       toast.success("تم إنشاء التعميم");
       (document.getElementById("ann-form") as HTMLFormElement)?.reset();
