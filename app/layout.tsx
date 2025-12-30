@@ -14,7 +14,7 @@ const tajawal = Tajawal({
 
 export const metadata = {
   title: "App",
-  description: "shadcn/ui default theme",
+  description: "Takween CMS Application",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

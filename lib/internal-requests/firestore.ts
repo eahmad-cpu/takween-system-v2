@@ -11,11 +11,14 @@ import {
   orderBy,
   doc,
   getDoc,
+  getDocs,
+  limit,
   updateDoc,
+  runTransaction,
   type QueryDocumentSnapshot,
   type DocumentData,
 } from "firebase/firestore"
-import { db, auth } from "@/lib/firebase"
+import { db } from "@/lib/firebase"
 import type { Role } from "@/lib/roles"
 import type {
   RequestType,
@@ -23,14 +26,56 @@ import type {
   RequestActionType,
   RequestStatus,
 } from "./types"
+import {
+  type RequestRecipientKey,
+  getRecipientByKey,
+} from "./recipients"
 
 const COLLECTION_NAME = "internalRequests"
+const COUNTERS_COLLECTION = "internalRequestCounters"
+
+// ===================== Helpers (Hybrid) =====================
+
+async function resolveAssigneeUidByRecipientKey(recipientKey: RequestRecipientKey) {
+  const qy = query(
+    collection(db, "users"),
+    where("requestRecipientKey", "==", recipientKey),
+    limit(1)
+  )
+
+  const snap = await getDocs(qy)
+  if (snap.empty) return null
+
+  const d = snap.docs[0]
+  const data = d.data() as any
+  const role = (data.role as Role | undefined) ?? null
+
+  return { uid: d.id, role }
+}
+
+async function resolveCcUidsByRecipientKeys(keys: RequestRecipientKey[]) {
+  const unique = Array.from(new Set(keys)).filter(Boolean) as RequestRecipientKey[]
+  if (unique.length === 0) return []
+
+  // Firestore "in" supports up to 30 values عادة، وإنت عندك max 16
+  const qy = query(
+    collection(db, "users"),
+    where("requestRecipientKey", "in", unique)
+  )
+
+  const snap = await getDocs(qy)
+  const out: string[] = []
+  snap.forEach((d) => out.push(d.id))
+  return Array.from(new Set(out))
+}
+
+// ===================== Mappers =====================
 
 // Helper عام يحوّل data + id إلى InternalRequest
-function mapDataToInternalRequest(id: string, data: any): InternalRequest {
+export function mapDataToInternalRequest(id: string, data: any): InternalRequest {
   const rawActions: any[] = Array.isArray(data.actions) ? data.actions : []
 
-  return {
+  const req: any = {
     id,
     title: data.title ?? "",
     type: data.type ?? "general",
@@ -40,7 +85,7 @@ function mapDataToInternalRequest(id: string, data: any): InternalRequest {
     createdByEmail: data.createdByEmail ?? null,
     createdByDept: data.createdByDept ?? null,
 
-    status: data.status ?? "open",
+    status: (data.status as RequestStatus) ?? "open",
 
     currentAssignee: {
       uid: data.currentAssignee?.uid ?? null,
@@ -71,6 +116,38 @@ function mapDataToInternalRequest(id: string, data: any): InternalRequest {
       }
     }),
   }
+
+  // حقول إضافية خاصة بالجهات والرقم
+  req.mainRecipientKey = data.mainRecipientKey ?? null
+  req.mainRecipientLabel = data.mainRecipientLabel ?? null
+  req.mainRecipientNumber = data.mainRecipientNumber ?? null
+  req.sequenceForRecipient = data.sequenceForRecipient ?? null
+  req.requestNumber = data.requestNumber ?? null
+  req.ccRecipientKeys = Array.isArray(data.ccRecipientKeys) ? data.ccRecipientKeys : []
+
+  req.currentAssigneeKey = data.currentAssigneeKey ?? null
+  req.currentAssigneeLabel = data.currentAssigneeLabel ?? null
+
+  // ✅ Hybrid fields
+  req.currentAssigneeUid = data.currentAssigneeUid ?? null
+  req.ccUids = Array.isArray(data.ccUids) ? data.ccUids : []
+  req.attachments = Array.isArray(data.attachments) ? data.attachments : []
+
+  // attachments
+  const rawAtt: any[] = Array.isArray(data.attachments) ? data.attachments : []
+  req.attachments = rawAtt.map((x) => ({
+    name: x?.name ?? "file",
+    size: Number(x?.size ?? 0),
+    contentType: x?.contentType ?? "application/octet-stream",
+    url: x?.url ?? "",
+    path: x?.path ?? "",
+    uploadedByUid: x?.uploadedByUid ?? null,
+    uploadedByLabel: x?.uploadedByLabel ?? null,
+    uploadedAtMs: typeof x?.uploadedAtMs === "number" ? x.uploadedAtMs : undefined,
+  }))
+
+
+  return req as InternalRequest
 }
 
 // تحويل مستند Firestore (query) إلى InternalRequest
@@ -81,7 +158,8 @@ function mapDocToInternalRequest(
   return mapDataToInternalRequest(docSnap.id, data)
 }
 
-// المدخلات المطلوبة لإنشاء طلب جديد
+// ===================== Old create (kept) =====================
+
 export type CreateInternalRequestInput = {
   title: string
   type: RequestType
@@ -98,9 +176,8 @@ export type CreateInternalRequestInput = {
 }
 
 /**
- * إنشاء طلب داخلي جديد في Firestore
- * - يسجّل الطلب نفسه
- * - يسجّل أول حركة (submitted) في actions
+ * (قديمة) إنشاء طلب داخلي بدون رقم خاص بالجهة
+ * — يفضّل استخدام createInternalRequestWithNumber بدلاً منها
  */
 export async function createInternalRequest(input: CreateInternalRequestInput) {
   const now = new Date()
@@ -119,9 +196,25 @@ export async function createInternalRequest(input: CreateInternalRequestInput) {
       uid: input.initialAssigneeUid,
       role: input.initialAssigneeRole,
     },
+    currentAssigneeUid: input.initialAssigneeUid ?? null,
 
     archived: false,
     pdfUrl: null,
+
+    // مفيش رقم طلب هنا
+    mainRecipientKey: null,
+    mainRecipientLabel: null,
+    mainRecipientNumber: null,
+    sequenceForRecipient: null,
+    requestNumber: null,
+
+    ccRecipientKeys: [],
+    ccUids: [],
+
+    currentAssigneeKey: null,
+    currentAssigneeLabel: null,
+
+    attachments: [],
 
     actions: [
       {
@@ -130,6 +223,7 @@ export async function createInternalRequest(input: CreateInternalRequestInput) {
         fromRole: input.createdByRole,
         toUid: input.initialAssigneeUid,
         toRole: input.initialAssigneeRole,
+        toRecipientKey: null,
         actionType: "submitted",
         comment: "",
       },
@@ -142,9 +236,139 @@ export async function createInternalRequest(input: CreateInternalRequestInput) {
   return docRef.id
 }
 
+// ===================== New create with per-recipient number (Hybrid) =====================
+
+export type CreateInternalRequestWithNumberInput = {
+  title: string
+  type: RequestType
+  description: string
+
+  createdByUid: string
+  createdByEmail?: string | null
+  createdByRole: Role | null
+  createdByDept?: string | null
+
+  // ✅ NEW: بيانات منشئ الطلب كجهة
+  createdByRecipientKey?: RequestRecipientKey | null
+  createdByLabel?: string | null
+
+  mainRecipientKey: RequestRecipientKey
+  ccRecipientKeys?: RequestRecipientKey[]
+}
+
 /**
- * الاستماع لطلبات المستخدم نفسه (طلباتي)
+ * إنشاء طلب داخلي:
+ * - يولّد sequence خاص بالجهة الأساسية
+ * - يبني requestNumber = "<mainRecipientNumber>/<sequence>"
+ * - يحدد المسؤول الحالي (Hybrid): currentAssigneeUid + currentAssignee
+ * - يحول ccRecipientKeys إلى ccUids (Hybrid)
  */
+export async function createInternalRequestWithNumber(
+  input: CreateInternalRequestWithNumberInput
+) {
+  const recipient = getRecipientByKey(input.mainRecipientKey)
+  if (!recipient) {
+    throw new Error(`Unknown mainRecipientKey: ${input.mainRecipientKey}`)
+  }
+
+  const ccKeys = Array.isArray(input.ccRecipientKeys)
+    ? (input.ccRecipientKeys as RequestRecipientKey[])
+    : []
+
+  // ✅ Hybrid: اعرف الشخص (UID) المرتبط بهذه الجهة
+  const assignee = await resolveAssigneeUidByRecipientKey(recipient.key)
+  if (!assignee?.uid) {
+    throw new Error(`لم يتم العثور على مستخدم مرتبط بالجهة: ${recipient.key}`)
+  }
+
+  // ✅ Hybrid: حوّل CC keys → CC uids
+  const ccUids = ccKeys.length ? await resolveCcUidsByRecipientKeys(ccKeys) : []
+
+  const now = new Date()
+  const counterRef = doc(db, COUNTERS_COLLECTION, recipient.key)
+  const reqRef = doc(collection(db, COLLECTION_NAME))
+
+  await runTransaction(db, async (tx) => {
+    // 1) sequence لكل جهة
+    const counterSnap = await tx.get(counterRef)
+    const prevSeq = counterSnap.exists()
+      ? (counterSnap.data().sequence as number) || 0
+      : 0
+    const nextSeq = prevSeq + 1
+
+    tx.set(
+      counterRef,
+      { sequence: nextSeq, updatedAt: serverTimestamp() },
+      { merge: true }
+    )
+
+    const requestNumber = `${recipient.number}/${nextSeq}`
+
+    // 2) بيانات الطلب
+    const docData = {
+      title: input.title,
+      type: input.type,
+      description: input.description,
+
+      createdByUid: input.createdByUid,
+      createdByEmail: input.createdByEmail ?? null,
+      createdByDept: input.createdByDept ?? null,
+
+      createdByRecipientKey: input.createdByRecipientKey ?? null,
+      createdByLabel: input.createdByLabel ?? null,
+
+      status: "open" as RequestStatus,
+
+      // الجهة الأساسية + رقم الطلب
+      mainRecipientKey: recipient.key,
+      mainRecipientLabel: recipient.label,
+      mainRecipientNumber: recipient.number,
+      sequenceForRecipient: nextSeq,
+      requestNumber,
+
+      // ✅ Hybrid: المسؤول الحالي = شخص الجهة
+      currentAssignee: {
+        uid: assignee.uid,
+        role: assignee.role,
+      },
+      currentAssigneeUid: assignee.uid,
+      currentAssigneeKey: recipient.key,
+      currentAssigneeLabel: recipient.label,
+
+      // ✅ CC (keys + uids)
+      ccRecipientKeys: ccKeys,
+      ccUids,
+
+      archived: false,
+      pdfUrl: null,
+
+      attachments: [],
+
+      actions: [
+        {
+          at: now,
+          fromUid: input.createdByUid,
+          fromRole: input.createdByRole,
+          toUid: assignee.uid,
+          toRole: assignee.role,
+          toRecipientKey: recipient.key,
+          actionType: "submitted" as RequestActionType,
+          comment: "",
+        },
+      ],
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+
+    tx.set(reqRef, docData)
+  })
+
+  return reqRef.id
+}
+
+// ===================== Listeners =====================
+
 export function listenMyRequests(
   uid: string,
   cb: (requests: InternalRequest[]) => void
@@ -155,16 +379,20 @@ export function listenMyRequests(
     orderBy("createdAt", "desc")
   )
 
-  return onSnapshot(q, (snap) => {
-    const items = snap.docs.map(mapDocToInternalRequest)
-    cb(items)
-  })
+  return onSnapshot(
+    q,
+    (snap) => {
+      const items = snap.docs.map(mapDocToInternalRequest)
+      cb(items)
+    },
+    (err) => {
+      // ✅ أثناء logout طبيعي يحصل permission-denied
+      if ((err as any)?.code === "permission-denied") return
+      console.error("listenMyRequests snapshot error:", err)
+    }
+  )
 }
 
-/**
- * الاستماع للطلبات الموجّهة لدور معيّن (مثلاً ceo)
- * نفلتر الحالات النشطة في الكلاينت (open + in_progress)
- */
 export function listenAssignedRequestsByRole(
   role: Role,
   cb: (requests: InternalRequest[]) => void
@@ -175,35 +403,43 @@ export function listenAssignedRequestsByRole(
     orderBy("createdAt", "desc")
   )
 
-  return onSnapshot(q, (snap) => {
-    const all = snap.docs.map(mapDocToInternalRequest)
-    const active = all.filter((r) =>
-      ["open", "in_progress"].includes(r.status)
-    )
-    cb(active)
-  })
+  return onSnapshot(
+    q,
+    (snap) => {
+      const all = snap.docs.map(mapDocToInternalRequest)
+      const active = all.filter((r) => ["open", "in_progress"].includes(r.status))
+      cb(active)
+    },
+    (err) => {
+      if ((err as any)?.code === "permission-denied") return
+      console.error("listenAssignedRequestsByRole snapshot error:", err)
+    }
+  )
 }
 
-/**
- * الاستماع لطلب واحد بالتحديد حسب الـ id
- */
 export function listenInternalRequestById(
   id: string,
   cb: (request: InternalRequest | null) => void
 ) {
   const ref = doc(db, COLLECTION_NAME, id)
 
-  return onSnapshot(ref, (snap) => {
-    if (!snap.exists()) {
-      cb(null)
-      return
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (!snap.exists()) {
+        cb(null)
+        return
+      }
+      cb(mapDataToInternalRequest(snap.id, snap.data() as any))
+    },
+    (err) => {
+      if ((err as any)?.code === "permission-denied") return
+      console.error("listenInternalRequestById snapshot error:", err)
     }
-    const data = snap.data() as any
-    cb(mapDataToInternalRequest(snap.id, data))
-  })
+  )
 }
 
-// ========= تنفيذ إجراء على الطلب (موافقة / رفض / إحالة / تعليق / إغلاق) =========
+// ===================== Actions =====================
 
 export type PerformRequestActionInput = {
   requestId: string
@@ -215,6 +451,7 @@ export type PerformRequestActionInput = {
   // للإحالة (forwarded) أو تغيير المسؤول
   targetUid?: string | null
   targetRole?: Role | null
+  targetRecipientKey?: RequestRecipientKey | null
 
   // لو عاوز تفرض حالة معيّنة (وإلا هنستنتج حسب نوع الحركة)
   newStatus?: RequestStatus | null
@@ -222,22 +459,19 @@ export type PerformRequestActionInput = {
 
 /**
  * يضيف Action جديد للطلب + يحدّث الحالة والمسؤول الحالي
- * وبعدها يرسل إشعارات للمستلمين المناسبين عبر API داخلية
  */
+// ========= تنفيذ إجراء على الطلب (موافقة / رفض / إحالة / تعليق / إغلاق) =========
 export async function performRequestAction(input: PerformRequestActionInput) {
   const ref = doc(db, COLLECTION_NAME, input.requestId)
   const snap = await getDoc(ref)
 
-  if (!snap.exists()) {
-    throw new Error("الطلب غير موجود")
-  }
+  if (!snap.exists()) throw new Error("الطلب غير موجود")
 
   const data = snap.data() as any
   const now = new Date()
-
   const existingActions: any[] = Array.isArray(data.actions) ? data.actions : []
 
-  // استنتاج الحالة الجديدة لو ماجتش صراحة
+  // استنتاج الحالة الجديدة
   let status: RequestStatus = (data.status as RequestStatus) ?? "open"
 
   if (input.newStatus) {
@@ -256,29 +490,26 @@ export async function performRequestAction(input: PerformRequestActionInput) {
       case "closed":
         status = "closed"
         break
-      case "comment":
-      case "submitted":
-      case "generated_pdf":
       default:
-        // لا تغيّر الحالة
         break
     }
   }
 
   // استنتاج المسؤول الحالي الجديد
   let currentAssignee = data.currentAssignee || { uid: null, role: null }
+  let currentAssigneeKey = data.currentAssigneeKey ?? null
+  let currentAssigneeLabel = data.currentAssigneeLabel ?? null
 
   if (input.actionType === "forwarded") {
-    currentAssignee = {
-      uid: input.targetUid ?? null,
-      role: input.targetRole ?? null,
-    }
+    currentAssignee = { uid: input.targetUid ?? null, role: input.targetRole ?? null }
+    currentAssigneeKey = input.targetRecipientKey ?? null
+
+    const rec = input.targetRecipientKey ? getRecipientByKey(input.targetRecipientKey) : null
+    currentAssigneeLabel = rec?.label ?? currentAssigneeLabel
   } else if (["approved", "rejected", "closed"].includes(input.actionType)) {
-    // بعد الاعتماد/الرفض/الإغلاق نعتبر مفيش أحد ماسك الطلب
-    currentAssignee = {
-      uid: null,
-      role: null,
-    }
+    currentAssignee = { uid: null, role: null }
+    currentAssigneeKey = null
+    currentAssigneeLabel = null
   }
 
   const newAction = {
@@ -287,41 +518,26 @@ export async function performRequestAction(input: PerformRequestActionInput) {
     fromRole: input.actorRole,
     toUid: input.targetUid ?? null,
     toRole: input.targetRole ?? null,
+    toRecipientKey: input.targetRecipientKey ?? null,
     actionType: input.actionType,
     comment: input.comment ?? "",
   }
 
   const updatedActions = [...existingActions, newAction]
 
-  // 🟦 تحديث الطلب في Firestore
+  // ✅ تفعيل الأرشيف تلقائياً عند الحالات النهائية
+  const terminal: RequestStatus[] = ["approved", "rejected", "closed", "cancelled"]
+  const prevArchived = Boolean(data.archived)
+  const archived = terminal.includes(status) ? true : prevArchived
+
   await updateDoc(ref, {
     status,
+    archived,
     currentAssignee,
+    currentAssigneeKey,
+    currentAssigneeLabel,
     actions: updatedActions,
     updatedAt: serverTimestamp(),
   })
-
-  // 🟢 بعد نجاح التحديث → نرسل إشعارات عبر API
-  try {
-    const token = await auth.currentUser?.getIdToken()
-    if (token) {
-      await fetch("/api/internal-requests/notify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          requestId: input.requestId,
-          actionType: input.actionType,
-          actorUid: input.actorUid,
-          actorRole: input.actorRole,
-          targetRole: input.targetRole ?? null,
-          targetUid: input.targetUid ?? null,
-        }),
-      })
-    }
-  } catch (e) {
-    console.warn("internal-requests notify failed", e)
-  }
 }
+

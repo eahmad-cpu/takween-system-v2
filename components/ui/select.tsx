@@ -38,7 +38,9 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md",
+        "z-50 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md",
+        // ✅ نفس عرض الـ Trigger
+        "w-[var(--radix-select-trigger-width)]",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         "data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         "data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
@@ -47,7 +49,8 @@ const SelectContent = React.forwardRef<
       position={position}
       {...props}
     >
-      <SelectPrimitive.Viewport className="p-1">
+      <SelectPrimitive.Viewport className="p-2 max-h-[240px] overflow-y-auto space-y-2">
+
         {children}
       </SelectPrimitive.Viewport>
     </SelectPrimitive.Content>
@@ -62,18 +65,25 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none",
-      "focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      // ✅ مستطيل زي تصميم "نسخة إلى"
+      "relative w-full cursor-default select-none rounded-md border px-3 py-2 pr-8 text-sm outline-none",
+      "hover:bg-muted/50 focus:bg-muted data-[state=checked]:bg-muted data-[state=checked]:font-medium",
+      "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className
     )}
     {...props}
   >
+    {/* علامة الاختيار */}
     <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
         <Check className="h-3 w-3" />
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+
+    {/* ✅ يسمح إن children يكون div/flex بدون مشاكل */}
+    <SelectPrimitive.ItemText asChild>
+      <div className="w-full">{children}</div>
+    </SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ))
 SelectItem.displayName = SelectPrimitive.Item.displayName

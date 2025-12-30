@@ -428,13 +428,13 @@ export default function EmployeeProfilePage() {
       {/* 🟦 بيانات الموظف من Google Sheets */}
       <EmployeeSheetCard
       nationalId={user.personalInfo?.nationalId}
-      title="بيانات الموظف من الشيت"
+      title="بيانات الموظف من جوجل شييت"
       />
 
-      <Separator />
+      {/* <Separator /> */}
 
       {/* التعميمات */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle>التعميمات الموجّهة للموظف</CardTitle>
         </CardHeader>
@@ -462,12 +462,12 @@ export default function EmployeeProfilePage() {
             ))}
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
-      <Separator />
+      {/* <Separator /> */}
 
       {/* الإشعارات */}
-      <Card>
+      {/* <Card>
         <CardHeader>
           <CardTitle>الإشعارات</CardTitle>
         </CardHeader>
@@ -510,12 +510,12 @@ export default function EmployeeProfilePage() {
             ))}
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
-      <Separator />
+      {/* <Separator /> */}
 
       {/* الشهادات */}
-      <div id="certificates" className="grid gap-3">
+      {/* <div id="certificates" className="grid gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold">الشهادات</h2>
 
@@ -588,12 +588,12 @@ export default function EmployeeProfilePage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
 
-      <Separator />
+      {/* <Separator /> */}
 
       {/* التقييمات */}
-      <div id="evaluations" className="grid gap-3">
+      {/* <div id="evaluations" className="grid gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold">التقييمات</h2>
 
@@ -657,7 +657,7 @@ export default function EmployeeProfilePage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </div> */}
     </div>
   );
 }

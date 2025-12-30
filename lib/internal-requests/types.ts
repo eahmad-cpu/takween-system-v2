@@ -1,5 +1,6 @@
 // lib/internal-requests/types.ts
 import type { Role } from "@/lib/roles"
+import type { RequestRecipientKey } from "./recipients"
 
 // حالة الطلب الرئيسية
 export type RequestStatus =
@@ -13,29 +14,41 @@ export type RequestStatus =
 // نوع الحركة على الطلب (في سجل الإحالات / التايم لاين)
 export type RequestActionType =
   | "submitted"     // أول إنشاء للطلب
-  | "forwarded"     // إحالة من شخص لآخر
+  | "forwarded"     // إحالة من جهة/شخص لجهة/شخص آخر
   | "approved"      // موافقة
   | "rejected"      // رفض
   | "comment"       // تعليق فقط
   | "closed"        // إغلاق الطلب
   | "generated_pdf" // تم توليد ملف PDF
 
-// نوع الطلب (ممكن نزود لاحقًا)
-export type RequestType =
-  | "general"   // عام
-  | "finance"   // مالية
-  | "hr"        // موارد بشرية
-  | "projects"  // مشاريع
-  | "it"        // تقني
+// نوع الطلب (اختياري — لو مش محتاجه سيبه)
+export type RequestType = "general" | "finance" | "hr" | "projects" | "it"
+export type RequestAttachment = {
+  name: string
+  size: number
+  contentType: string
+  url: string
+  path: string
+
+  uploadedByUid: string | null
+  uploadedByLabel: string | null
+  uploadedAtMs?: number
+}
 
 // خطوة / حركة واحدة في سجل الطلب
 export interface RequestAction {
-  id?: string // اختياري لو حبيت تدي لكل حركة ID
+  id?: string
   at: Date | null
+
   fromUid: string | null
   fromRole: Role | null
+
   toUid: string | null
   toRole: Role | null
+
+  // مهم لنظام الجهات
+  toRecipientKey?: RequestRecipientKey | null
+
   actionType: RequestActionType
   comment: string
 }
@@ -43,8 +56,10 @@ export interface RequestAction {
 // الكيان الأساسي للطلب
 export interface InternalRequest {
   id: string
+
   title: string
-  type: RequestType
+  // خليته اختياري عشان لو مش هتستخدم النوع
+  type?: RequestType
   description: string
 
   createdByUid: string
@@ -53,10 +68,27 @@ export interface InternalRequest {
 
   status: RequestStatus
 
+  // المسؤول الحالي (لو بتستخدم uid/role)
   currentAssignee: {
     uid: string | null
     role: Role | null
   }
+
+  // ✅ نظام الجهات (الجديد)
+  mainRecipientKey: RequestRecipientKey | null
+  mainRecipientLabel: string | null
+  mainRecipientNumber: number | null
+  createdByLabel: string | null
+  sequenceForRecipient: number | null
+  // مثال: "2/15"
+  requestNumber: string | null
+
+  // نسخة للإطلاع
+  ccRecipientKeys: RequestRecipientKey[]
+
+  // الجهة المكلّفة حاليًا
+  currentAssigneeKey: RequestRecipientKey | null
+  currentAssigneeLabel: string | null
 
   createdAt: Date | null
   updatedAt: Date | null
@@ -65,4 +97,7 @@ export interface InternalRequest {
   pdfUrl?: string | null
 
   actions: RequestAction[]
+
+  attachments?: RequestAttachment[]
+
 }

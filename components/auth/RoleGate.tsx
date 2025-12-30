@@ -1,10 +1,8 @@
 // components/auth/RoleGate.tsx
-"use client"
+"use client";
 
-import { ReactNode, useMemo } from "react"
-import { useClaimsRole } from "@/hooks/useClaimsRole"
-
-type Role = "employee" | "hr" | "chairman" | "ceo" | "admin" | "superadmin"
+import { ReactNode, useMemo } from "react";
+import useClaimsRole, { Role } from "@/hooks/use-claims-role";
 
 const rolePriority: Record<Role, number> = {
   employee: 1,
@@ -13,13 +11,11 @@ const rolePriority: Record<Role, number> = {
   ceo: 4,
   admin: 5,
   superadmin: 6,
-}
+};
 
-function hasRoleAtLeast(userRole: string | null, min: Role) {
-  if (!userRole) return false
-  // لو جالك role خارج القائمة هنعامله كـ employee
-  const safe = (userRole in rolePriority ? (userRole as Role) : "employee")
-  return rolePriority[safe] >= rolePriority[min]
+function hasRoleAtLeast(userRole: Role | null, min: Role) {
+  if (!userRole) return false;
+  return rolePriority[userRole] >= rolePriority[min];
 }
 
 export default function RoleGate({
@@ -27,25 +23,26 @@ export default function RoleGate({
   fallback = null,
   children,
 }: {
-  min: Role
-  fallback?: ReactNode
-  children: ReactNode
+  min: Role;
+  fallback?: ReactNode;
+  children: ReactNode;
 }) {
-  const { role, loading } = useClaimsRole()
+  const { role, loading } = useClaimsRole();
 
   const allowed = useMemo(() => {
-    if (loading) return false
-    return hasRoleAtLeast(role, min)
-  }, [loading, role, min])
+    if (loading) return false;
+    return hasRoleAtLeast(role, min);
+  }, [loading, role, min]);
 
   if (loading) {
-    // شاشة انتظار بسيطة أثناء تحميل الـ claims
-    return <div className="text-sm text-muted-foreground">جارٍ التحقق من الصلاحيات…</div>
+    return (
+      <div className="text-sm text-muted-foreground">
+        جارٍ التحقق من الصلاحيات…
+      </div>
+    );
   }
 
-  if (!allowed) {
-    return <>{fallback}</> // ممكن تمرّر نص/زر/تلميح بديل
-  }
+  if (!allowed) return <>{fallback}</>;
 
-  return <>{children}</>
+  return <>{children}</>;
 }

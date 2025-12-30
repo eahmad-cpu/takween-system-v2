@@ -37,13 +37,12 @@ type Emp = {
   schoolType?: string;
 };
 type GroupSpec = { id: string; title: string; schoolKey: string };
-
 type Stats = {
-  totalEmployees: number;
-  totalAnnouncements: number;
-  totalCertificates: number;
-  // ممكن تضيف إحصائيات الطلبات لاحقًا
-};
+  totalEmployees: number
+  totalAnnouncements: number
+  totalCertificates: number
+}
+
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
@@ -53,15 +52,15 @@ export default function DashboardPage() {
   const [manarBoys, setManarBoys] = useState<Emp[]>([]);
   const [manarGirls, setManarGirls] = useState<Emp[]>([]);
   const [kgGroups, setKgGroups] = useState<Record<string, Emp[]>>({});
-
-  const [stats, setStats] = useState<Stats>({
+const [stats, setStats] = useState<Stats>({
     totalEmployees: 0,
     totalAnnouncements: 0,
     totalCertificates: 0,
-  });
-  const [loadingStats, setLoadingStats] = useState(true);
+  })
+  const [loadingStats, setLoadingStats] = useState(true)
 
-  // تحميل الموظفين حسب الوحدات والمدارس
+
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -77,7 +76,7 @@ export default function DashboardPage() {
           where("schoolKey", "==", "manar_girls"),
           orderBy("name"),
         ];
-
+        // unit+schoolType+orderBy يحتاج Composite؛ fallback يزيل orderBy
         const kgSpecs: GroupSpec[] = [
           {
             id: "kg1",
@@ -146,92 +145,76 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // إحصائيات عامة
-  useEffect(() => {
-    let cancelled = false;
+
+useEffect(() => {
+    let cancelled = false
 
     async function loadStats() {
       try {
-        setLoadingStats(true);
+        setLoadingStats(true)
 
+        // 1) إجمالي الموظفين: users الذين لديهم tag = "staff"
         const employeesQ = query(
           collection(db, "users"),
           where("tags", "array-contains", "staff")
-        );
-        const employeesSnap = await getDocs(employeesQ);
-        const totalEmployees = employeesSnap.size;
+        )
+        const employeesSnap = await getDocs(employeesQ)
+        const totalEmployees = employeesSnap.size
 
-        const annsSnap = await getDocs(collection(db, "announcements"));
-        const totalAnnouncements = annsSnap.size;
+        // 2) عدد التعميمات من collection "announcements"
+        const annsSnap = await getDocs(collection(db, "announcements"))
+        const totalAnnouncements = annsSnap.size
 
-        const certsSnap = await getDocs(collectionGroup(db, "certificates"));
-        const totalCertificates = certsSnap.size;
+        // 3) عدد الشهادات من كل الـ certificates (collectionGroup)
+        const certsSnap = await getDocs(
+          collectionGroup(db, "certificates")
+        )
+        const totalCertificates = certsSnap.size
 
         if (!cancelled) {
           setStats({
             totalEmployees,
             totalAnnouncements,
             totalCertificates,
-          });
+          })
         }
       } catch (e) {
-        console.error("stats load error", e);
+        console.error("stats load error", e)
       } finally {
-        if (!cancelled) setLoadingStats(false);
+        if (!cancelled) setLoadingStats(false)
       }
     }
 
-    loadStats();
+    loadStats()
     return () => {
-      cancelled = true;
-    };
-  }, []);
+      cancelled = true
+    }
+  }, [])
+
+
+
 
   return (
     <HRGate>
       <div className="grid gap-6">
         {/* كروت إحصائية سريعة */}
-        {/* <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           <StatCard
             title="إجمالي الموظفين"
-            value={loadingStats ? "…" : stats.totalEmployees}
+          value={loadingStats ? "…" : stats.totalEmployees}
           />
           <StatCard
             title="عدد التعميمات"
-            value={loadingStats ? "…" : stats.totalAnnouncements}
+          value={loadingStats ? "…" : stats.totalAnnouncements}
           />
           <StatCard
             title="عدد الشهادات الصادرة"
-            value={loadingStats ? "…" : stats.totalCertificates}
-          />
-        </div> */}
-
-        {/* كروت الوصول السريع لنظام الطلبات */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <QuickLinkCard
-            title="إنشاء طلب"
-            description="بدء طلب داخلي جديد وتوجيهه للجهة المناسبة."
-            href="/requests/new"
-          />
-          <QuickLinkCard
-            title="الوارد"
-            description="الطلبات الموجّهة إليك حاليًا وتحتاج إلى إجراء."
-            href="/requests/inbox"
-          />
-          <QuickLinkCard
-            title="الصادر"
-            description="الطلبات التي قمت بإنشائها ومتابعة حالتها."
-            href="/requests/outbox"
-          />
-          <QuickLinkCard
-            title="الأرشيف"
-            description="الطلبات المغلقة / المنتهية حسب سياسة الأرشفة."
-            href="/requests/archive"
+          value={loadingStats ? "…" : stats.totalCertificates}
           />
         </div>
 
-        {/* أقسام الموظفين */}
-        {/* <Accordion
+        {/* أقسام قابلة للطي */}
+        <Accordion
           type="multiple"
           defaultValue={[
             "council",
@@ -271,13 +254,13 @@ export default function DashboardPage() {
             title="روضة واحة الرياحين الرابعة"
             rows={kgGroups["kg4"] ?? []}
           />
-        </Accordion> */}
+        </Accordion>
       </div>
     </HRGate>
   );
 }
 
-/** استعلام مع fallback لو فيه مشكلة إندكس */
+/** يحاول تنفيذ الاستعلام مع orderBy، ولو احتاج إندكس أو كان يبني → يعيد التنفيذ بدون orderBy ثم يرتّب محليًا */
 async function fetchWithIndexFallback(
   colRef: ReturnType<typeof collection>,
   constraints: QueryConstraint[],
@@ -288,10 +271,12 @@ async function fetchWithIndexFallback(
     const snap = await getDocs(q1);
     return sortByName(mapDocs(snap.docs));
   } catch (e: any) {
+    // Firestore: required index / building → code = "failed-precondition"
     const needsIndex = e?.code === "failed-precondition";
     if (!needsIndex) throw e;
     const q2 = query(colRef, ...fallbackConstraints);
     const snap2 = await getDocs(q2);
+    // ترتيب محلي بدل orderBy("name")
     return sortByName(mapDocs(snap2.docs));
   }
 }
@@ -380,31 +365,11 @@ function StatCard({ title, value }: { title: string; value: string | number }) {
       <CardContent className="flex items-end justify-between">
         <div>
           <div className="text-3xl font-bold">{value}</div>
+          {/* <p className="text-sm text-muted-foreground">—</p> */}
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function QuickLinkCard({
-  title,
-  description,
-  href,
-}: {
-  title: string;
-  description: string;
-  href: string;
-}) {
-  return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="flex items-end justify-between gap-2">
-        <p className="text-xs text-muted-foreground max-w-[70%]">{description}</p>
-        <Button asChild size="sm" variant="outline">
-          <Link href={href}>فتح</Link>
-        </Button>
+        {/* <Button asChild variant="outline">
+          <Link href="/employees">قائمة الموظفين</Link>
+        </Button> */}
       </CardContent>
     </Card>
   );
