@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   collection,
@@ -17,12 +17,30 @@ import { mapDataToInternalRequest } from "@/lib/internal-requests/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getRecipientByKey } from "@/lib/internal-requests/recipients";
+import { applyRequestFilters, defaultRequestsFilters } from "@/lib/internal-requests/filters";
+import RequestsFiltersBar from "@/components/requests/RequestsFilters";
+import { searchRequestsByTitleOnly } from "@/lib/internal-requests/search";
+import RequestsSearchBar from "@/components/requests/RequestsSearchBar";
 
 export default function OutboxPage() {
   const router = useRouter();
   const { uid, loading } = useClaimsRole();
   const [items, setItems] = useState<InternalRequest[]>([]);
   const [subscribed, setSubscribed] = useState(false);
+  const [filters, setFilters] = useState(defaultRequestsFilters);
+  const [q, setQ] = useState("");
+
+  const filteredItems = useMemo(() => {
+    const afterFilters = applyRequestFilters(items, filters, {
+      mode: "outbox",
+
+    });
+
+    return searchRequestsByTitleOnly(afterFilters, q);
+  }, [items, filters, q]);
+
+  const hasActiveFilters =
+    JSON.stringify(filters) !== JSON.stringify(defaultRequestsFilters);
 
   useEffect(() => {
     if (loading) return;
@@ -57,17 +75,27 @@ export default function OutboxPage() {
     );
   }
 
+
+
+
   return (
     <div className="grid gap-4">
       <Card>
         <CardHeader>
           <CardTitle>الصادر (طلباتي)</CardTitle>
         </CardHeader>
-
+        <div className="px-6 pb-4">
+          <RequestsSearchBar value={q} onChange={setQ} />
+        </div>
+        <div className="px-6 pb-4">
+          <RequestsFiltersBar mode="outbox" value={filters} onChange={setFilters} />
+        </div>
         <CardContent>
-          {items.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <div className="text-sm text-muted-foreground">
-              لم تقم بإنشاء أي طلبات بعد.
+              {hasActiveFilters
+                ? "لا توجد نتائج مطابقة للفلاتر الحالية."
+                : "لم تقم بإنشاء أي طلبات بعد."}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -83,7 +111,7 @@ export default function OutboxPage() {
                 </thead>
 
                 <tbody>
-                  {items.map((r) => {
+                  {filteredItems.map((r) => {
                     const toLabel =
                       (r as any).currentAssigneeLabel ||
                       ((r as any).currentAssigneeKey

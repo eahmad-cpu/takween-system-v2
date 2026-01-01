@@ -22,6 +22,17 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getRecipientByEmail } from "@/lib/internal-requests/recipients";
 
+
+import RequestsFiltersBar from "@/components/requests/RequestsFilters";
+import {
+  applyRequestFilters,
+  defaultRequestsFilters,
+} from "@/lib/internal-requests/filters";
+
+import RequestsSearchBar from "@/components/requests/RequestsSearchBar";
+import { searchRequestsByTitleOnly } from "@/lib/internal-requests/search";
+
+
 type RecipientKey = string;
 
 export default function InboxPage() {
@@ -37,6 +48,7 @@ export default function InboxPage() {
   const [subscribedCc, setSubscribedCc] = useState(false);
 
   const [errMsg, setErrMsg] = useState<string | null>(null);
+
 
   // 1) هات requestRecipientKey من users/{uid}
   useEffect(() => {
@@ -171,6 +183,25 @@ export default function InboxPage() {
 
   const subscribed = subscribedPrimary && subscribedCc;
 
+  const [filters, setFilters] = useState(defaultRequestsFilters);
+  const [q, setQ] = useState("");
+
+  const filteredItems = useMemo(() => {
+    const afterFilters = applyRequestFilters(items, filters, {
+      mode: "inbox",
+      myRecipientKey,
+    });
+
+    return searchRequestsByTitleOnly(afterFilters, q);
+  }, [items, filters, myRecipientKey, q]);
+
+  const hasActiveFilters =
+    JSON.stringify(filters) !== JSON.stringify(defaultRequestsFilters);
+
+
+
+
+
   if (loading || !subscribed) {
     return (
       <div className="min-h-[40vh] grid place-items-center text-sm text-muted-foreground">
@@ -221,11 +252,32 @@ export default function InboxPage() {
         <CardHeader>
           <CardTitle>الوارد</CardTitle>
         </CardHeader>
+        <div className="px-6 pb-4">
+          <RequestsSearchBar value={q} onChange={setQ} />
+        </div>
+        <div className="px-6 pb-4"><RequestsFiltersBar mode="inbox" value={filters} onChange={setFilters} /></div>
 
         <CardContent>
-          {items.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              لا توجد طلبات واردة حاليًا.
+          {filteredItems.length === 0 ? (
+            <div className="text-sm text-muted-foreground p-6 rounded-md grid gap-4">
+              <div>
+                {hasActiveFilters
+                  ? "لا توجد نتائج مطابقة للفلاتر الحالية."
+                  : "لا توجد طلبات واردة حاليًا."}
+              </div>
+
+              {hasActiveFilters && (
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFilters(defaultRequestsFilters)}
+                  >
+                    مسح الفلاتر
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
