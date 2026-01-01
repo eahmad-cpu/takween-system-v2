@@ -2,31 +2,53 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+
 import useClaimsRole from "@/hooks/use-claims-role";
 import { hasRoleAtLeast, Role } from "@/lib/roles";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/layout/ThemeToggle"
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { useEffect, useState } from "react";
+import { Menu, X } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
 
 
 type NavItem = { label: string; href: string; minRole: Role };
 
 const NAV_ITEMS: NavItem[] = [
   { label: "ملفي", href: "/me", minRole: "employee" },
-  { label: "لوحة التحكم", href: "/dashboard", minRole: "hr" },
-  { label: "الشهادات", href: "/certificates", minRole: "hr" },
-  { label: "التعميمات", href: "/announcements", minRole: "hr" },
+
+  // لوحة التحكم نسيبها HR+ زي ما كانت
+  { label: "الرئيسية ", href: "/dashboard", minRole: "employee" },
+
+  // الطلبات متاحة لكل الموظفين
+  { label: "إنشاء طلب", href: "/requests/new", minRole: "employee" },
+  { label: "الوارد", href: "/requests/inbox", minRole: "employee" },
+  { label: "الصادر", href: "/requests/outbox", minRole: "employee" },
+  { label: "الأرشيف", href: "/requests/archive", minRole: "employee" },
+
+  // ممكن لاحقًا تشيل دول لو حابب
+  // { label: "الشهادات", href: "/certificates", minRole: "hr" },
+  // { label: "التعميمات", href: "/announcements", minRole: "hr" },
 ];
+
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   // ✅ كل الـ hooks في الأول
   const { role, uid, loading } = useClaimsRole();
   const pathname = usePathname();
   const router = useRouter();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isHrOrAbove = hasRoleAtLeast(role, "hr");
-  const isAnnouncementsPath = pathname?.startsWith("/announcements");
+  //const isAnnouncementsPath = pathname?.startsWith("/announcements");
   // ❗ تعريف المسارات الممنوعة على الموظف العادي فقط
   const isForbiddenHrPathForNonHr = (() => {
     if (!pathname) return false;
@@ -133,64 +155,96 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <div>
         <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur">
           <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-            {/* الشعار */}
-            <div className="font-bold">
-              {/* نسخة الديسكتوب: نص ثابت */}
-              <span className="hidden md:inline">Takween</span>
+            {/* Left: Hamburger + Logo */}
+            <div className="flex items-center gap-2">
+              {/* Hamburger (mobile only) */}
+              <div className="md:hidden">
+                <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="icon" aria-label="فتح القائمة">
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </SheetTrigger>
 
-              {/* نسخة الجوال: زر يودّي للوحة التحكم لو انا في صفحة التعميمات */}
-              <button
-                type="button"
-                className="md:hidden"
-                onClick={() => {
-                  if (isHrOrAbove && isAnnouncementsPath) {
-                    router.push("/dashboard");
-                  }
-                }}
-              >
-                Takween
-              </button>
-            </div>
+                  <SheetContent side="right" className="w-[280px] p-0">
+                    <SheetHeader className="sr-only">
+                      <SheetTitle>القائمة</SheetTitle>
+                    </SheetHeader>
 
-            {/* روابط + خروج للموبايل فقط */}
-            <div className="md:hidden flex items-center gap-2">
-              <Link
-                href={uid ? `/employees/${uid}` : "/me"}
-                className="text-sm underline"
-              >
-                ملفي
-              </Link>
+                    {/* Header داخل الـ Drawer */}
+                    <div className="flex items-center justify-between border-b px-4 h-14">
+                      <div className="font-bold">Takween</div>
+                      {/* <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="إغلاق"
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        <X className="h-5 w-5" />
+                      </Button> */}
+                    </div>
 
-              {isHrOrAbove && (
-                <Link href="/announcements" className="text-sm underline">
-                  التعميمات
-                </Link>
-              )}
+                    
+                    <div className="p-4 space-y-2">
+                      {items.map((it) => {
+                        const targetHref =
+                          it.href === "/me" && uid ? `/employees/${uid}` : it.href;
 
-              {/* زر تسجيل الخروج على الموبايل */}
-              <form
-                action={async () => {
-                  const { signOut } = await import("firebase/auth");
-                  const { auth } = await import("@/lib/firebase");
-                  await signOut(auth);
-                  router.replace("/login");
-                }}
-              >
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  className="text-xs px-2 py-1"
+                        const active =
+                          pathname === it.href || pathname?.startsWith(it.href + "/");
+
+                        return (
+                          <Link
+                            key={it.href}
+                            href={targetHref}
+                            onClick={() => setMobileOpen(false)}
+                            className={`block rounded px-3 py-2 text-sm ${active ? "bg-muted font-semibold" : "hover:bg-muted"
+                              }`}
+                          >
+                            {it.label}
+                          </Link>
+                        );
+                      })}
+
+                      <form
+                        action={async () => {
+                          const { signOut } = await import("firebase/auth");
+                          const { auth } = await import("@/lib/firebase");
+                          await signOut(auth);
+                          setMobileOpen(false);
+                          router.replace("/login");
+                        }}
+                      >
+                        <Button type="submit" variant="outline" className="w-full mt-4">
+                          تسجيل الخروج
+                        </Button>
+                      </form>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </div>
+
+              {/* Logo */}
+              <div className="font-bold">
+                <span className="hidden md:inline">Takween</span>
+                <button
+                  type="button"
+                  className="md:hidden"
+                  onClick={() => router.push("/dashboard")}
                 >
-                  تسجيل الخروج
-                </Button>
-              </form>
-
+                  Takween
+                </button>
+              </div>
             </div>
-            <NotificationBell />
-            <ThemeToggle />
+
+            {/* Right: actions */}
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <ThemeToggle />
+            </div>
           </div>
         </header>
+
 
         <main className="container mx-auto px-4 py-6">{children}</main>
       </div>
