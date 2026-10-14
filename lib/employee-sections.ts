@@ -141,7 +141,7 @@ export const EMPLOYEE_SECTIONS: EmployeeSectionConfig[] = [
 
   {
     key: "holidays",
-    title: "تفاصيل الإجازات والغياب",
+    title: "سجل الملاحظات",
     description: "",
     spreadsheetId: "1xbDLkgjpzZOLA_CM34Q6Bu0rZYrjOwT3SZxigClcQ30",
     sheetName: "ملخص_اجازات_للادارة",

@@ -25,6 +25,22 @@ function formatDate(value: string | null | undefined) {
 function leaveTypeBadgeClass(type: string) {
   const t = String(type || "").trim();
 
+  if (t.includes("تصحيح بصمة") || t.includes("تصحيح بصمه")) {
+    return "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-950/30 dark:text-sky-300 dark:border-sky-900";
+  }
+
+  if (t.includes("إعفاء") || t.includes("اعفاء")) {
+    return "bg-teal-100 text-teal-800 border-teal-200 dark:bg-teal-950/30 dark:text-teal-300 dark:border-teal-900";
+  }
+
+  if (t.includes("استئذان")) {
+    return "bg-orange-100 text-orange-800 border-orange-200 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-900";
+  }
+
+  if (t.includes("حافز غياب") || t.includes("حافز")) {
+    return "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-900";
+  }
+
   if (t.includes("بدون عذر")) {
     return "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-900";
   }
@@ -59,6 +75,21 @@ function leaveTypeBadgeClass(type: string) {
 function leaveRowClass(type: string) {
   const t = String(type || "").trim();
 
+  if (t.includes("تصحيح بصمة") || t.includes("تصحيح بصمه")) {
+    return "bg-sky-50/60 dark:bg-sky-950/10";
+  }
+
+  if (t.includes("إعفاء") || t.includes("اعفاء")) {
+    return "bg-teal-50/60 dark:bg-teal-950/10";
+  }
+
+  if (t.includes("استئذان")) {
+    return "bg-orange-50/60 dark:bg-orange-950/10";
+  }
+
+  if (t.includes("حافز غياب") || t.includes("حافز")) {
+    return "bg-indigo-50/60 dark:bg-indigo-950/10";
+  }
   if (t.includes("بدون عذر")) return "bg-red-50/60 dark:bg-red-950/10";
   if (t.includes("بعذر رسمي")) return "bg-blue-50/60 dark:bg-blue-950/10";
   if (t.includes("بعذر مقبول"))
@@ -79,70 +110,66 @@ export default function EmployeeLeaveEventsTable({
   events: LeaveEvent[];
 }) {
   return (
-  <div dir="rtl" className="w-full space-y-3 text-right">
-    {/* هذه الحاوية هي السر: w-full مع overflow-x-auto */}
-    <div className="w-full overflow-x-auto rounded-xl border border-border">
-      <table className="w-full min-w-[1000px] text-sm"> 
-        <thead className="bg-muted/50 border-b">
-          <tr className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">
-             <th className="px-4 text-right">التاريخ</th>
-            <th className="px-4 text-right">اليوم</th>
-            <th className="px-4 text-right">نوع الإجازة</th>
-            <th className="px-4 text-right">الشهر</th>
-            <th className="px-4 text-right">المصدر</th>
-            <th className="px-4 text-right">الوصف</th>
-            <th className="px-4 text-right">الملاحظة كاملة</th>
-                  
-                </tr>
-              </thead>
+    <div dir="rtl" className="w-full space-y-3 text-right">
+      {/* هذه الحاوية هي السر: w-full مع overflow-x-auto */}
+      <div className="w-full overflow-x-auto rounded-xl border border-border">
+        <table className="w-full min-w-[1000px] text-sm">
+          <thead className="bg-muted/50 border-b">
+            <tr className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">
+              <th className="px-4 text-right">التاريخ</th>
+              <th className="px-4 text-right">اليوم</th>
+              <th className="px-4 text-right">نوع الملاحظة</th>
+              <th className="px-4 text-right">الشهر</th>
+              <th className="px-4 text-right">المصدر</th>
+              <th className="px-4 text-right">الوصف</th>
+              <th className="px-4 text-right">الملاحظة كاملة</th>
+            </tr>
+          </thead>
 
-              <tbody className="[&_tr:last-child]:border-0">
-                {events.map((event, index) => (
-                  <tr
-                    key={`${event.eventDate}-${event.leaveType}-${index}`}
-                    className={`border-b transition-colors hover:bg-muted/50 ${leaveRowClass(event.leaveType)}`}
+          <tbody className="[&_tr:last-child]:border-0">
+            {events.map((event, index) => (
+              <tr
+                key={`${event.eventDate}-${event.leaveType}-${index}`}
+                className={`border-b transition-colors hover:bg-muted/50 ${leaveRowClass(event.leaveType)}`}
+              >
+                <td className="p-4 align-middle whitespace-nowrap">
+                  {formatDate(event.eventDate)}
+                </td>
+
+                <td className="p-4 align-middle whitespace-nowrap">
+                  {event.dayName || "—"}
+                </td>
+
+                <td className="p-4 align-middle whitespace-nowrap">
+                  <span
+                    className={`inline-flex rounded-full border px-2 py-1 text-xs  ${leaveTypeBadgeClass(
+                      event.leaveType,
+                    )}`}
                   >
-                    <td className="p-4 align-middle whitespace-nowrap">
-                      {formatDate(event.eventDate)}
-                    </td>
+                    {event.leaveType || "—"}
+                  </span>
+                </td>
 
-                    <td className="p-4 align-middle whitespace-nowrap">
-                      {event.dayName || "—"}
-                    </td>
+                <td className="p-4 align-middle whitespace-nowrap">
+                  {event.monthLabel || "—"}
+                </td>
 
-                    <td className="p-4 align-middle whitespace-nowrap">
-                      <span
-                        className={`inline-flex rounded-full border px-2 py-1 text-xs  ${leaveTypeBadgeClass(
-                          event.leaveType,
-                        )}`}
-                      >
-                        {event.leaveType || "—"}
-                      </span>
-                    </td>
+                <td className="p-4 align-middle whitespace-nowrap">
+                  {event.source || "—"}
+                </td>
 
-                    <td className="p-4 align-middle whitespace-nowrap">
-                      {event.monthLabel || "—"}
-                    </td>
+                <td className="min-w-[220px] max-w-[360px] p-4 align-middle whitespace-normal leading-7">
+                  {event.description || "—"}
+                </td>
 
-                    <td className="p-4 align-middle whitespace-nowrap">
-                      {event.source || "—"}
-                    </td>
-
-                    <td className="p-4 align-middle whitespace-nowrap">
-                      {event.description || "—"}
-                    </td>
-
-                    <td className="p-4 align-middle whitespace-nowrap">
-                      {event.fullNote || "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-        
+                <td className="min-w-[280px] max-w-[460px] p-4 align-middle whitespace-normal leading-7">
+                  {event.fullNote || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    
+    </div>
   );
 }

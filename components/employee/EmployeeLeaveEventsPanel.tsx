@@ -216,7 +216,7 @@ export default function EmployeeLeaveEventsPanel({
           </div>
 
           <div className="grid gap-2">
-            <div className="text-xs text-muted-foreground">نوع الإجازة</div>
+            <div className="text-xs text-muted-foreground">النوع</div>
             <Select value={leaveType} onValueChange={setLeaveType}>
               <SelectTrigger>
                 <SelectValue placeholder="اختر النوع" />
@@ -277,7 +277,7 @@ export default function EmployeeLeaveEventsPanel({
 
       <Card className="max-w-full overflow-hidden">
         <CardHeader>
-          <CardTitle>سجل الإجازات</CardTitle>
+          <CardTitle>السجل</CardTitle>
         </CardHeader>
         {/* أضفنا w-full و overflow-hidden هنا أيضاً لضمان عدم خروج الجدول */}
         <CardContent className="space-y-3 text-right w-full overflow-hidden">

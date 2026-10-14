@@ -759,7 +759,7 @@ const EMPLOYEE_CARDS: EmployeeCard[] = [
   },
   {
     key: "leave-events",
-    title: "تفاصيل الإجازات والغياب",
+    title: "سجل الملاحظات",
     description: "  ",
     href: (uid) => `/employees/${uid}/leave-events`,
     enabled: true,
