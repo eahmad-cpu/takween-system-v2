@@ -66,18 +66,16 @@ function getYearOptions() {
 
 const MONTH_OPTIONS = [
   { value: "all", label: "كل الشهور" },
-  { value: "1", label: "يناير" },
-  { value: "2", label: "فبراير" },
-  { value: "3", label: "مارس" },
-  { value: "4", label: "أبريل" },
-  { value: "5", label: "مايو" },
-  { value: "6", label: "يونيو" },
-  { value: "7", label: "يوليو" },
-  { value: "8", label: "أغسطس" },
-  { value: "9", label: "سبتمبر" },
-  { value: "10", label: "أكتوبر" },
-  { value: "11", label: "نوفمبر" },
-  { value: "12", label: "ديسمبر" },
+  { value: "2026-08", label: "أغسطس 2026" },
+  { value: "2026-09", label: "سبتمبر 2026" },
+  { value: "2026-10", label: "أكتوبر 2026" },
+  { value: "2026-11", label: "نوفمبر 2026" },
+  { value: "2026-12", label: "ديسمبر 2026" },
+  { value: "2027-01", label: "يناير 2027" },
+  { value: "2027-02", label: "فبراير 2027" },
+  { value: "2027-03", label: "مارس 2027" },
+  { value: "2027-04", label: "أبريل 2027" },
+  { value: "2027-05", label: "مايو 2027" },
 ];
 
 export default function EmployeeLeaveEventsPanel({
@@ -125,10 +123,16 @@ export default function EmployeeLeaveEventsPanel({
 
         const params = new URLSearchParams();
         params.set("nationalId", nationalId);
-        params.set("year", year);
 
-        if (year !== "all" && month !== "all") {
-          params.set("month", month);
+        if (month !== "all") {
+          const [yearValue, monthValue] = month.split("-");
+
+          params.set("year", yearValue);
+          params.set("month", String(Number(monthValue)));
+        } else if (year !== "all") {
+          params.set("year", year);
+        } else {
+          params.set("range", "all");
         }
 
         if (leaveType !== "all") {
@@ -168,11 +172,11 @@ export default function EmployeeLeaveEventsPanel({
     };
   }, [nationalId, year, month, leaveType]);
 
-  useEffect(() => {
-    if (year === "all" && month !== "all") {
-      setMonth("all");
-    }
-  }, [year, month]);
+  // useEffect(() => {
+  //   if (year === "all" && month !== "all") {
+  //     setMonth("all");
+  //   }
+  // }, [year, month]);
 
   const employee = data?.employee;
   const summary = data?.summary;
