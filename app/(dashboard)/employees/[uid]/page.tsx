@@ -713,7 +713,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, FileText, Briefcase, FolderOpen } from "lucide-react";
+import { ChevronLeft, FileText, Briefcase, FolderOpen, GraduationCap } from "lucide-react";
 import {
   BadgeInfo,
   CalendarDays,
@@ -789,6 +789,14 @@ const EMPLOYEE_CARDS: EmployeeCard[] = [
     href: (uid) => `/employees/${uid}/job-compliance`,
     enabled: true,
     icon: ShieldCheck,
+  },
+  {
+    key: "professional-development",
+    title: "التطوير المهني",
+    description: "الدورات والشهادات والملفات التطويرية",
+    href: (uid) => `/employees/${uid}/professional-development`,
+    enabled: true,
+    icon: GraduationCap,
   },
 ];
 
